@@ -1,0 +1,102 @@
+---
+title: "Regression Models Project"
+author: "Carlos Alberto Guevara Díez"
+date: "18 de septiembre de 2015"
+output: pdf_document
+---
+
+## Executive Summary
+For the purpose of this analisys I´m using the mtcars dataset available in R, for further information about the dataset please refer to its [help file](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/mtcars.html). The goal of this analysis is to answer the questions: "Is an automatic or manual transmission better for MPG?" and "Quantify the MPG difference between automatic and manual transmissions". As a result the analysis will prove that manual transmission is better than automatic, and that that in a car with average horse power, and a 4 cylinder, straight engine, a manual transmission that expected difference is about 5.2 miles per gallon.
+
+## Exploratory Data Analysis
+The first thing to do is pre-process the dataset and add some descriptive an case transformations, this will help to standardize the data and make the exploratory analisys easier.
+```{r Descriptions, echo=FALSE}
+    data(mtcars)
+# Replace automatic/manual factor with descriptive terms and lower case to make it easier
+    mtcars$am[which(mtcars$am==0)]<-"automatic transmission"
+    mtcars$am[which(mtcars$am==1)]<-"manual transmission"
+    mtcars$am<-as.factor(mtcars$am)
+
+# Replace "vs" factor with descriptive terms and lower case to make it easier
+    mtcars$vs[which(mtcars$vs==0)]<-"v engine"
+    mtcars$vs[which(mtcars$vs==1)]<-"straight engine"
+    mtcars$vs<-as.factor(mtcars$vs)
+
+# Create facors in cylinders, # of gears, and # of carburators to factors
+    mtcars$cyl<-as.factor(mtcars$cyl)
+    mtcars$gear<-as.factor(mtcars$gear)
+    mtcars$carb<-as.factor(mtcars$carb)
+```
+
+Whit the pre procesed data now I can make a basic exploratory analysis and a summary exploration explained with the **Fig. 1 of the appendix "Exploratory BoxPlot"**, with this I can easily answer to the first question that manual transmission is better than automatic. In addition a t-test have been made comparing the mean between two transmission data groups (manual and auto), the confidence interval (95%) does not contain zero (-11.28,-3.21) and p-value is greater than 0.005. Then, it can be concluded that the average consumption, in miles per gallon, with automatic transmission is higher than the manual transmission. It is possible to quantify the MPG difference between automatic and manual transmissions: 7.24 mpg greater subtracting means. Additionally it is concluded that there are other variables correlated with mpg according to the graph analysis in the **Fig. 2 of the appendix "Pair analisys"**.
+```{r t_test}
+datAuto <- mtcars$mpg[mtcars$am == "automatic transmission"]
+datManual <- mtcars$mpg[mtcars$am == "manual transmission"];
+t.test(datAuto, datManual, paired = FALSE, alternative="two.sided", var.equal=FALSE)
+```
+
+## Prediction Models
+To obtain different approaches of the solution, several models will be analyzed in this section. To evaluate the accuraccy of each model I will use: The adjusted R-squared, the interpretablility of the model (e.g. how much sense does it make to include the included variables), and the signifigance of the term of interest, the trasmission type variable.
+
+For the first approach I´ve taken only fuel eficciency and transmission type:
+```{r Mpg_Trans, echo=FALSE}
+    lmOne<-lm(mpg~am, data=mtcars)
+    summary(lmOne)[c(4,9)]
+```
+This is the easiest model and the results are simple to explain, the Transmission variable is significant, nevertheless as we dod not take into account other variables the adjustes R-squared is low.
+
+The second approach involves all the variables in the mtcars dataset, for space limitations I'm only showing the R-squared result that is bigger than the first model, nevertheless, the most of the time its not a good strategy to include all the variables because some of them may be representing the same characteristics or may add noise to the model.
+```{r, echo=FALSE}
+    lmAll<-lm(mpg~., data=mtcars)
+    summary(lmAll)[c(9)]
+```
+
+To add accuraccy to the results I need to explore a third model, this one is using the variables fuel economy, transmission type, horse power, number of cylinders and engine shape as variables.
+```{r FinalModel, echo=FALSE}
+    lmFinal<-lm(mpg~am+hp+cyl+vs, data=mtcars)
+    summary(lmFinal)[c(4,9)]
+```
+In this model I'm showing that the selected variables have an obvious effect on fuel economy (Refer to Fig. 3 of the appendix "Effects of included variables in fuel economy"). This model also shows a higher adjusted R-squared than the other two models.
+
+## Conclusions
+The final model (and, in fact, all of the models included) show that manual transmissions had better fuel efficiency in 1974.  The model has a positive coefficient for the "Manual Transmission" term.  This matches what we expected from the initial exploratory analysis.
+
+The third and final model show us that if a car changes from the base case - automatic transmission, average horse power, 4 cylinders, and a straight engine - and switches to a manual transmission, it can expect to gain 5.16 miles per gallon of fuel efficiency.  The 95% confidence interval for this value is [`r confint(lmFinal)[2,]`]:, Fig. 4 of the appendix "Residual Plot in Final Model" shows  that the behavior of the third model is adequate considering normal residuals and constant variability. The leverage is within reasonable upper limit.
+
+## Appendix
+
+### Fig. 1 .- Exploratory BoxPlot
+```{r model_boxplot, echo=FALSE, results='hide', message=FALSE, fig.align='center', fig.height=3}
+require(lattice)    
+require(ggplot2)
+    
+summary.data <- function(x) {
+  temp <- c(min(x), mean(x) - sd(x), mean(x), mean(x) + sd(x), max(x))
+  names(temp) <- c("ymin", "lower", "middle", "upper", "ymax")
+  temp
+}
+    
+bp1 <- ggplot(aes(y = mpg, x = factor(am), fill=factor(am)), data = mtcars)
+bp1 <- bp1 + stat_summary(fun.data = summary.data, geom = "boxplot") + geom_jitter(position=position_jitter(width=.2), size=3) + ggtitle("Miles per Gallon (MPG) by Transmission") + xlab("Transmission") + ylab("MPG - Miles per Gallon")
+bp1    
+```
+
+### Fig. 2 .- Pair Analisys
+```{r PairAnalisys, echo=FALSE, results='hide', message=FALSE, fig.align='center'}
+require(graphics)
+pairs(mtcars,main = "Pair Panel - Mtcars dataset", panel=panel.smooth)
+```
+
+### Fig. 3 .- Effects of included variables in fuel economy
+```{r, echo=FALSE, fig.height=3}
+    bwplot(mpg~am|vs, data=mtcars, main="Fuel Economy by Trasmission and Engine Type")
+    bwplot(mpg~am|cyl, data=mtcars, main="Fuel Economy by Transmission and Number of Cylinders")
+    bwplot(mpg~am|cut(hp,4), data=mtcars, main="Fuel Economy by Transmission and Horse Power")
+```
+
+### Fig. 4 .- Residual Plot in Final Model
+```{r, echo=FALSE}
+    par(mfrow=c(2,2))
+    plot(lmFinal)
+    par(mfrow=c(1,1))
+```
